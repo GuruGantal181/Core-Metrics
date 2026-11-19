@@ -25,8 +25,7 @@ public class DietLogDAO {
             stmt.setInt(3, log.getCalories());
             stmt.setDouble(4, log.getProteinG());
             stmt.executeUpdate();
-        } 
-        catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }
@@ -51,8 +50,7 @@ public class DietLogDAO {
 
                 history.add(new DietLog(logId, userId, food, calories, proteinG, consumedAt));
             }
-        } 
-        catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
         return history;
@@ -74,10 +72,22 @@ public class DietLogDAO {
             if (rs.next()) {
                 return rs.getInt("total_cal");
             }
-        } 
-        catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
         return 0;
+    }
+
+    public int getNetCaloriesInRange(int userId, Timestamp startInclusive, Timestamp endExclusive,CardioLogDAO cardioDao) {
+        int caloriesIn = getTotalCaloriesInRange(userId, startInclusive, endExclusive);
+        double cardioOut = cardioDao.getTotalCardioCaloriesInRange(userId, startInclusive, endExclusive);
+        return caloriesIn - (int) Math.round(cardioOut);
+    }
+
+    public double getCaloricDeficitInRange(int userId, Timestamp startInclusive, Timestamp endExclusive,double bmr, int daysInRange, CardioLogDAO cardioDao) {
+        int caloriesIn = getTotalCaloriesInRange(userId, startInclusive, endExclusive);
+        double cardioOut = cardioDao.getTotalCardioCaloriesInRange(userId, startInclusive, endExclusive);
+        double totalExpenditure = (bmr * daysInRange) + cardioOut;
+        return totalExpenditure - caloriesIn;
     }
 }
