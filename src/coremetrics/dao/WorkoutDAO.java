@@ -5,8 +5,11 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import coremetrics.models.Workout;
 
 public class WorkoutDAO {
@@ -16,16 +19,15 @@ public class WorkoutDAO {
 
     // CREATE
     public void saveWorkout(Workout workout) {
-        String sql = "INSERT INTO STRENGTH_LOGS (user_id, exercise_name, weight_lifted, reps, sets) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO strength_logs (user_id, exercise_id, weight_kg, reps) VALUES (?, ?, ?, ?)";
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, workout.getUserId());
-            stmt.setString(2, workout.getExerciseName());
-            stmt.setDouble(3, workout.getWeightLifted());
+            stmt.setInt(2, workout.getExerciseId());
+            stmt.setDouble(3, workout.getWeightKg());
             stmt.setInt(4, workout.getReps());
-            stmt.setInt(5, workout.getSets());
             stmt.executeUpdate();
-        }
+        } 
         catch (SQLException e) {
             e.printStackTrace();
         }
@@ -34,28 +36,51 @@ public class WorkoutDAO {
     // READ
     public List<Workout> getWorkoutsByUserId(int userId) {
         List<Workout> history = new ArrayList<>();
-        String sql = "SELECT * FROM STRENGTH_LOGS WHERE user_id = ?";
-        
+        String sql = "SELECT * FROM strength_logs WHERE user_id = ?";
+
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setInt(1, userId);
             ResultSet rs = stmt.executeQuery();
-            
+
             while (rs.next()) {
-                int id = rs.getInt("id");
-                String exercise = rs.getString("exercise_name");
-                double weight = rs.getDouble("weight_lifted");
+                int logId = rs.getInt("log_id");
+                int exerciseId = rs.getInt("exercise_id");
+                double weightKg = rs.getDouble("weight_kg");
                 int reps = rs.getInt("reps");
-                int sets = rs.getInt("sets");
-                java.sql.Timestamp logDate = rs.getTimestamp("log_date");
-                
-                history.add(new Workout(id, userId, exercise, weight, reps, sets, logDate));
+                Timestamp loggedAt = rs.getTimestamp("logged_at");
+
+                history.add(new Workout(logId, userId, exerciseId, weightKg, reps, loggedAt));
             }
         } 
         catch (SQLException e) {
             e.printStackTrace();
         }
         return history;
+    }
+
+    public Map<String, Double> getMaxWeightPerExercise(int userId) {
+        Map<String, Double> maxLifts = new HashMap<>();
+        String sql = "SELECT e.name, MAX(s.weight_kg) AS max_weight " +
+                     "FROM strength_logs s " +
+                     "INNER JOIN exercise_dict e ON s.exercise_id = e.exercise_id " +
+                     "WHERE s.user_id = ? " +
+                     "GROUP BY e.name";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                maxLifts.put(rs.getString("name"), rs.getDouble("max_weight"));
+            }
+        } 
+        catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return maxLifts;
     }
 }

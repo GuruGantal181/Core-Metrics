@@ -12,45 +12,49 @@ public class UserDAO {
     private static final String USER = "root";
     private static final String PASS = "meetmadaan26.";
 
-    // CREATE 
+    // CREATE
     public int saveUser(User user) {
-        String sql = "INSERT INTO USER_PROFILES (weight_kg, height_cm, age) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO user_profiles (weight_kg, height_cm, age, gender) VALUES (?, ?, ?, ?)";
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
              PreparedStatement stmt = conn.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
-            
+
             stmt.setDouble(1, user.getWeightKg());
             stmt.setDouble(2, user.getHeightCm());
             stmt.setInt(3, user.getAge());
+            stmt.setString(4, user.getGender());
             stmt.executeUpdate();
-            
+
             ResultSet rs = stmt.getGeneratedKeys();
             if (rs.next()) {
                 return rs.getInt(1);
             }
-        } catch (SQLException e) {
+        } 
+        catch (SQLException e) {
             e.printStackTrace();
         }
-        return -1; 
+        return -1;
     }
 
     // READ
-    public User getUserById(int id) {
-        String sql = "SELECT * FROM USER_PROFILES WHERE id = ?";
+    public User getUserById(int userId) {
+        String sql = "SELECT * FROM user_profiles WHERE user_id = ?";
         try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setInt(1, id);
+
+            stmt.setInt(1, userId);
             ResultSet rs = stmt.executeQuery();
-            
+
             if (rs.next()) {
                 return new User(
-                    rs.getInt("id"),
+                    rs.getInt("user_id"),
                     rs.getDouble("weight_kg"),
                     rs.getDouble("height_cm"),
-                    rs.getInt("age")
+                    rs.getInt("age"),
+                    rs.getString("gender")
                 );
             }
-        } catch (SQLException e) {
+        } 
+        catch (SQLException e) {
             e.printStackTrace();
         }
         return null;

@@ -2,38 +2,48 @@ package coremetrics.models;
 import java.sql.Timestamp;
 
 public class Workout {
-    private int id;
+    private int logId;
     private int userId;
-    private String exerciseName;
-    private double weightLifted;
+    private int exerciseId;
+    private double weightKg;
     private int reps;
-    private int sets;
-    private Timestamp logDate;
+    private Timestamp loggedAt;
 
-    public Workout(int id, int userId, String exerciseName, double weightLifted, int reps, int sets) {
-        this.id = id;
-        this.userId = userId;
-        this.exerciseName = exerciseName;
-        this.weightLifted = weightLifted;
-        this.reps = reps;
-        this.sets = sets;
+    public Workout() {
     }
 
-    public Workout(int id, int userId, String exerciseName, double weightLifted, int reps, int sets, Timestamp logDate) {
-        this.id = id;
+    public Workout(int logId, int userId, int exerciseId, double weightKg, int reps) {
+        this.logId = logId;
         this.userId = userId;
-        this.exerciseName = exerciseName;
-        this.weightLifted = weightLifted;
+        this.exerciseId = exerciseId;
+        this.weightKg = weightKg;
         this.reps = reps;
-        this.sets = sets;
-        this.logDate = logDate;
     }
 
-    public int getId() { return id; }
+    public Workout(int logId, int userId, int exerciseId, double weightKg, int reps, Timestamp loggedAt) {
+        this.logId = logId;
+        this.userId = userId;
+        this.exerciseId = exerciseId;
+        this.weightKg = weightKg;
+        this.reps = reps;
+        this.loggedAt = loggedAt;
+    }
+
+    public int getLogId() { return logId; }
+    public void setLogId(int logId) { this.logId = logId; }
+
     public int getUserId() { return userId; }
-    public String getExerciseName() { return exerciseName; }
-    public double getWeightLifted() { return weightLifted; }
+    public void setUserId(int userId) { this.userId = userId; }
+
+    public int getExerciseId() { return exerciseId; }
+    public void setExerciseId(int exerciseId) { this.exerciseId = exerciseId; }
+
+    public double getWeightKg() { return weightKg; }
+    public void setWeightKg(double weightKg) { this.weightKg = weightKg; }
+
     public int getReps() { return reps; }
-    public int getSets() { return sets; }
-    public Timestamp getLogDate() { return logDate; }
+    public void setReps(int reps) { this.reps = reps; }
+
+    public Timestamp getLoggedAt() { return loggedAt; }
+    public void setLoggedAt(Timestamp loggedAt) { this.loggedAt = loggedAt; }
 }
