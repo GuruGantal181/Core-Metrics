@@ -2,6 +2,9 @@ CREATE DATABASE IF NOT EXISTS core_metrics;
 USE core_metrics;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP VIEW IF EXISTS user_daily_nutrition_view;
+DROP PROCEDURE IF EXISTS GetUserWeeklySummary;
+DROP TRIGGER IF EXISTS trg_validate_strength_log;
 DROP TABLE IF EXISTS routine_map;
 DROP TABLE IF EXISTS routines;
 DROP TABLE IF EXISTS strength_logs;
@@ -102,3 +105,49 @@ INSERT INTO exercise_dict (name, type, met_value, created_by_uid) VALUES
 ('Pullups', 'strength', 8.00, NULL),
 ('Treadmill Run', 'cardio', 9.80, NULL),
 ('Cycling', 'cardio', 7.50, NULL);
+
+-- ==========================================
+-- 8. VIEW: User Daily Calorie & Protein Summary
+-- ==========================================
+CREATE OR REPLACE VIEW user_daily_nutrition_view AS
+SELECT 
+    u.user_id,
+    u.gender,
+    u.weight_kg,
+    DATE(d.consumed_at) AS log_date,
+    SUM(d.calories) AS total_calories_in,
+    SUM(d.protein_g) AS total_protein_g
+FROM user_profiles u
+INNER JOIN diet_logs d ON u.user_id = d.user_id
+GROUP BY u.user_id, u.gender, u.weight_kg, DATE(d.consumed_at);
+
+-- ==========================================
+-- 9. STORED PROCEDURE: User Weekly Summary
+-- ==========================================
+DELIMITER //
+CREATE PROCEDURE GetUserWeeklySummary(IN p_user_id INT)
+BEGIN
+    SELECT 
+        (SELECT COALESCE(SUM(calories), 0) FROM diet_logs 
+         WHERE user_id = p_user_id AND consumed_at >= NOW() - INTERVAL 7 DAY) AS weekly_calories_in,
+        (SELECT COALESCE(SUM(calories_out), 0) FROM cardio_logs 
+         WHERE user_id = p_user_id AND logged_at >= NOW() - INTERVAL 7 DAY) AS weekly_cardio_out,
+        (SELECT COUNT(*) FROM strength_logs 
+         WHERE user_id = p_user_id AND logged_at >= NOW() - INTERVAL 7 DAY) AS weekly_strength_sets;
+END //
+DELIMITER ;
+
+-- ==========================================
+-- 10. TRIGGER: Validate Strength Log Before Insert
+-- ==========================================
+DELIMITER //
+CREATE TRIGGER trg_validate_strength_log
+BEFORE INSERT ON strength_logs
+FOR EACH ROW
+BEGIN
+    IF NEW.weight_kg < 0 OR NEW.reps <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Invalid strength log: weight_kg must be >= 0 and reps must be > 0';
+    END IF;
+END //
+DELIMITER ;
