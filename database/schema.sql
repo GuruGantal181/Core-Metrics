@@ -3,7 +3,9 @@ USE core_metrics;
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP VIEW IF EXISTS user_daily_nutrition_view;
+DROP FUNCTION IF EXISTS CalculateUserBMR;
 DROP PROCEDURE IF EXISTS GetUserWeeklySummary;
+DROP PROCEDURE IF EXISTS CalculateTotalStrengthVolume;
 DROP TRIGGER IF EXISTS trg_validate_strength_log;
 DROP TABLE IF EXISTS routine_map;
 DROP TABLE IF EXISTS routines;
@@ -17,9 +19,9 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 1. USER_PROFILES
 CREATE TABLE user_profiles (
     user_id INT NOT NULL AUTO_INCREMENT,
-    weight_kg DECIMAL(5,2) NOT NULL,
-    height_cm DECIMAL(5,2) NOT NULL,
-    age INT NOT NULL,
+    weight_kg DECIMAL(5,2) NOT NULL CHECK (weight_kg > 0),
+    height_cm DECIMAL(5,2) NOT NULL CHECK (height_cm > 0),
+    age INT NOT NULL CHECK (age > 0 AND age <= 120),
     gender ENUM('M', 'F') NOT NULL,
     PRIMARY KEY (user_id)
 );
@@ -29,9 +31,10 @@ CREATE TABLE exercise_dict (
     exercise_id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     type ENUM('strength', 'cardio') NOT NULL,
-    met_value DECIMAL(4,2) NOT NULL,
+    met_value DECIMAL(4,2) NOT NULL CHECK (met_value > 0),
     created_by_uid INT NULL,
     PRIMARY KEY (exercise_id),
+    UNIQUE (name, created_by_uid),
     FOREIGN KEY (created_by_uid) REFERENCES user_profiles(user_id) ON DELETE SET NULL
 );
 
@@ -41,6 +44,7 @@ CREATE TABLE routines (
     user_id INT NOT NULL,
     routine_name VARCHAR(100) NOT NULL,
     PRIMARY KEY (routine_id),
+    UNIQUE (user_id, routine_name),
     FOREIGN KEY (user_id) REFERENCES user_profiles(user_id) ON DELETE CASCADE
 );
 
@@ -77,8 +81,8 @@ CREATE TABLE cardio_logs (
     user_id INT NOT NULL,
     exercise_id INT NOT NULL,
     incline_pct DECIMAL(4,2) DEFAULT 0.00,
-    duration_m INT NOT NULL,
-    calories_out DECIMAL(6,2) NOT NULL,
+    duration_m INT NOT NULL CHECK (duration_m > 0),
+    calories_out DECIMAL(6,2) NOT NULL CHECK (calories_out >= 0),
     logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (log_id),
     INDEX idx_cardio_date (logged_at),
@@ -91,8 +95,8 @@ CREATE TABLE diet_logs (
     log_id INT NOT NULL AUTO_INCREMENT,
     user_id INT NOT NULL,
     food_item VARCHAR(100) NOT NULL,
-    calories INT NOT NULL,
-    protein_g DECIMAL(5,2) NOT NULL,
+    calories INT NOT NULL CHECK (calories >= 0),
+    protein_g DECIMAL(5,2) NOT NULL CHECK (protein_g >= 0),
     consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (log_id),
     INDEX idx_diet_date (consumed_at),
@@ -138,7 +142,37 @@ END //
 DELIMITER ;
 
 -- ==========================================
--- 10. TRIGGER: Validate Strength Log Before Insert
+-- 10. STORED FUNCTION: Calculate User BMR
+-- ==========================================
+DELIMITER //
+CREATE FUNCTION CalculateUserBMR(p_user_id INT)
+RETURNS DECIMAL(7,2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE v_weight DECIMAL(5,2);
+    DECLARE v_height DECIMAL(5,2);
+    DECLARE v_age INT;
+    DECLARE v_gender ENUM('M', 'F');
+    DECLARE v_bmr DECIMAL(7,2);
+
+    SELECT weight_kg, height_cm, age, gender
+    INTO v_weight, v_height, v_age, v_gender
+    FROM user_profiles
+    WHERE user_id = p_user_id;
+
+    IF v_gender = 'M' THEN
+        SET v_bmr = (10 * v_weight) + (6.25 * v_height) - (5 * v_age) + 5;
+    ELSE
+        SET v_bmr = (10 * v_weight) + (6.25 * v_height) - (5 * v_age) - 161;
+    END IF;
+
+    RETURN v_bmr;
+END //
+DELIMITER ;
+
+-- ==========================================
+-- 11. TRIGGER: Validate Strength Log Before Insert
 -- ==========================================
 DELIMITER //
 CREATE TRIGGER trg_validate_strength_log
@@ -149,5 +183,38 @@ BEGIN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Invalid strength log: weight_kg must be >= 0 and reps must be > 0';
     END IF;
+END //
+DELIMITER ;
+
+-- ==========================================
+-- 12. CURSOR PROCEDURE: Total Strength Volume for a User
+-- ==========================================
+DELIMITER //
+CREATE PROCEDURE CalculateTotalStrengthVolume(IN p_user_id INT, OUT p_total_volume DECIMAL(10,2))
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_weight DECIMAL(5,2);
+    DECLARE v_reps INT;
+    DECLARE v_running_total DECIMAL(10,2) DEFAULT 0.00;
+
+    DECLARE strength_cur CURSOR FOR
+        SELECT weight_kg, reps
+        FROM strength_logs
+        WHERE user_id = p_user_id;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    OPEN strength_cur;
+
+    read_loop: LOOP
+        FETCH strength_cur INTO v_weight, v_reps;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+        SET v_running_total = v_running_total + (v_weight * v_reps);
+    END LOOP;
+
+    CLOSE strength_cur;
+    SET p_total_volume = v_running_total;
 END //
 DELIMITER ;
