@@ -1,12 +1,53 @@
 {
-  "user": {
-    "name": "Devansh",
-    "bmr_kcal": 1825,
-    "daily_target_kcal": 1800
+  "users": [
+    {
+      "userId": 1,
+      "weightKg": 72.5,
+      "heightCm": 178.0,
+      "age": 21,
+      "gender": "M"
+    }
+  ],
+  "exercises": [
+    {
+      "exerciseId": 1,
+      "name": "Bench Press",
+      "type": "strength",
+      "metValue": 6.0,
+      "createdByUid": null
+    },
+    {
+      "exerciseId": 3,
+      "name": "Treadmill Run",
+      "type": "cardio",
+      "metValue": 9.8,
+      "createdByUid": null
+    }
+  ],
+  "analytics": {
+    "days": 7,
+    "bmr": 1780.5,
+    "totalIntake": 12600,
+    "totalCardioBurn": 950.0,
+    "netCalories": 11650.0,
+    "caloricDeficit": 2323.5
   },
   "workouts": [
-    { "date": "2026-11-01", "exercise": "Bench Press", "weight_kg": 60, "reps": 2, "estimated_1rm": 64.0 },
-    { "date": "2026-11-08", "exercise": "Bench Press", "weight_kg": 62.5, "reps": 2, "estimated_1rm": 66.7 },
-    { "date": "2026-11-15", "exercise": "Bench Press", "weight_kg": 65, "reps": 2, "estimated_1rm": 69.3 }
+    {
+      "logId": 101,
+      "userId": 1,
+      "exerciseId": 1,
+      "weightKg": 60.0,
+      "reps": 8,
+      "loggedAt": "2026-11-01T10:00:00"
+    },
+    {
+      "logId": 102,
+      "userId": 1,
+      "exerciseId": 1,
+      "weightKg": 62.5,
+      "reps": 8,
+      "loggedAt": "2026-11-08T10:00:00"
+    }
   ]
 }

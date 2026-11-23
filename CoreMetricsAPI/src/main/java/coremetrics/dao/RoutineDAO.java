@@ -1,9 +1,9 @@
 package coremetrics.dao;
 
 import coremetrics.models.Routine;
+import coremetrics.models.RoutineExercise;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -12,33 +12,34 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RoutineDAO {
-    private static final String URL = "jdbc:mysql://localhost:3306/core_metrics";
-    private static final String USER = "root";
-    private static final String PASS = "Keshav@123";
 
     public int createRoutine(Routine routine) {
         String sql = "INSERT INTO routines (user_id, routine_name) VALUES (?, ?)";
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             stmt.setInt(1, routine.getUserId());
-            stmt.setString(2, routine.getRoutineName());
+            stmt.setString(2, routine.getRoutineName().trim());
             stmt.executeUpdate();
 
-            ResultSet rs = stmt.getGeneratedKeys();
-            if (rs.next()) {
-                return rs.getInt(1);
+            try (ResultSet keys = stmt.getGeneratedKeys()) {
+                if (keys.next()) {
+                    return keys.getInt(1);
+                }
             }
+            throw new DatabaseException("create routine (no generated id returned)", null);
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DatabaseException("create routine", e);
         }
-        return -1;
     }
 
-    public void addExerciseToRoutine(int routineId, int exerciseId, int defaultSets, int defaultReps, double defaultIncl, int defaultDur) {
+    public void addExerciseToRoutine(int routineId, int exerciseId, int defaultSets,
+                                     int defaultReps, double defaultIncl, int defaultDur) {
         String sql = "INSERT INTO routine_map (routine_id, exercise_id, default_sets, default_reps, default_incl, default_dur) "
-                   + "VALUES (?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+                + "VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, routineId);
@@ -49,132 +50,119 @@ public class RoutineDAO {
             stmt.setInt(6, defaultDur);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DatabaseException("map exercise to routine", e);
         }
     }
 
-    // TRANSACTION (COMMIT / ROLLBACK): Atomically create a routine and map its first exercise
+    /** Creates a routine and its first mapped exercise in one transaction. */
     public int createRoutineWithExerciseAtomic(int userId, String routineName, int exerciseId,
                                                int defaultSets, int defaultReps,
                                                double defaultIncl, int defaultDur) {
         String insertRoutineSql = "INSERT INTO routines (user_id, routine_name) VALUES (?, ?)";
         String insertMapSql = "INSERT INTO routine_map (routine_id, exercise_id, default_sets, default_reps, default_incl, default_dur) "
-                            + "VALUES (?, ?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?, ?)";
 
-        Connection conn = null;
-        try {
-            conn = DriverManager.getConnection(URL, USER, PASS);
-            conn.setAutoCommit(false); // Begin explicit transaction
-
-            int generatedRoutineId = -1;
-            try (PreparedStatement routineStmt = conn.prepareStatement(insertRoutineSql, Statement.RETURN_GENERATED_KEYS)) {
-                routineStmt.setInt(1, userId);
-                routineStmt.setString(2, routineName);
-                routineStmt.executeUpdate();
-
-                ResultSet rs = routineStmt.getGeneratedKeys();
-                if (rs.next()) {
-                    generatedRoutineId = rs.getInt(1);
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                int routineId;
+                try (PreparedStatement routineStmt = conn.prepareStatement(insertRoutineSql, Statement.RETURN_GENERATED_KEYS)) {
+                    routineStmt.setInt(1, userId);
+                    routineStmt.setString(2, routineName.trim());
+                    routineStmt.executeUpdate();
+                    try (ResultSet keys = routineStmt.getGeneratedKeys()) {
+                        if (!keys.next()) {
+                            throw new SQLException("No routine id was generated.");
+                        }
+                        routineId = keys.getInt(1);
+                    }
                 }
-            }
 
-            try (PreparedStatement mapStmt = conn.prepareStatement(insertMapSql)) {
-                mapStmt.setInt(1, generatedRoutineId);
-                mapStmt.setInt(2, exerciseId);
-                mapStmt.setInt(3, defaultSets);
-                mapStmt.setInt(4, defaultReps);
-                mapStmt.setDouble(5, defaultIncl);
-                mapStmt.setInt(6, defaultDur);
-                mapStmt.executeUpdate();
-            }
+                try (PreparedStatement mapStmt = conn.prepareStatement(insertMapSql)) {
+                    mapStmt.setInt(1, routineId);
+                    mapStmt.setInt(2, exerciseId);
+                    mapStmt.setInt(3, defaultSets);
+                    mapStmt.setInt(4, defaultReps);
+                    mapStmt.setDouble(5, defaultIncl);
+                    mapStmt.setInt(6, defaultDur);
+                    mapStmt.executeUpdate();
+                }
 
-            conn.commit(); // Commit both inserts atomically
-            return generatedRoutineId;
+                conn.commit();
+                return routineId;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback(); // Roll back routine creation if mapping fails (e.g., invalid exerciseId FK)
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                }
-            }
-            e.printStackTrace();
-        } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            }
+            throw new DatabaseException("create routine and map its first exercise", e);
         }
-        return -1;
     }
 
-    // DELETE: Removes routine and automatically cascades deletion to routine_map
     public boolean deleteRoutine(int routineId) {
         String sql = "DELETE FROM routines WHERE routine_id = ?";
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, routineId);
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DatabaseException("delete routine", e);
         }
-        return false;
     }
 
     public List<Routine> getRoutinesByUserId(int userId) {
         List<Routine> routines = new ArrayList<>();
-        String sql = "SELECT routine_id, user_id, routine_name FROM routines WHERE user_id = ? ORDER BY routine_id";
+        String sql = "SELECT routine_id, user_id, routine_name FROM routines WHERE user_id = ? ORDER BY routine_name, routine_id";
 
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, userId);
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                routines.add(new Routine(
-                        rs.getInt("routine_id"),
-                        rs.getInt("user_id"),
-                        rs.getString("routine_name")
-                ));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    routines.add(new Routine(
+                            rs.getInt("routine_id"),
+                            rs.getInt("user_id"),
+                            rs.getString("routine_name")
+                    ));
+                }
             }
+            return routines;
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DatabaseException("load routines", e);
         }
-        return routines;
     }
 
-    public List<String> getRoutineExercises(int routineId) {
-        List<String> items = new ArrayList<>();
-        String sql = "SELECT e.name, e.type, rm.default_sets, rm.default_reps, rm.default_incl, rm.default_dur "
-                   + "FROM routine_map rm "
-                   + "INNER JOIN exercise_dict e ON rm.exercise_id = e.exercise_id "
-                   + "WHERE rm.routine_id = ? "
-                   + "ORDER BY e.exercise_id";
+    public List<RoutineExercise> getRoutineExercises(int routineId) {
+        List<RoutineExercise> items = new ArrayList<>();
+        String sql = "SELECT e.exercise_id, e.name, e.type, rm.default_sets, rm.default_reps, rm.default_incl, rm.default_dur "
+                + "FROM routine_map rm INNER JOIN exercise_dict e ON rm.exercise_id = e.exercise_id "
+                + "WHERE rm.routine_id = ? ORDER BY e.name";
 
-        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+        try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, routineId);
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                String name = rs.getString("name");
-                String type = rs.getString("type");
-                if ("cardio".equalsIgnoreCase(type)) {
-                    items.add(name + " [cardio] - " + rs.getInt("default_dur") + " min @ "
-                            + rs.getDouble("default_incl") + "% incline");
-                } else {
-                    items.add(name + " [strength] - " + rs.getInt("default_sets") + " sets x "
-                            + rs.getInt("default_reps") + " reps");
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    items.add(new RoutineExercise(
+                            rs.getInt("exercise_id"),
+                            rs.getString("name"),
+                            rs.getString("type"),
+                            rs.getInt("default_sets"),
+                            rs.getInt("default_reps"),
+                            rs.getDouble("default_incl"),
+                            rs.getInt("default_dur")
+                    ));
                 }
             }
+            return items;
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DatabaseException("load exercises mapped to routine", e);
         }
-        return items;
     }
 }

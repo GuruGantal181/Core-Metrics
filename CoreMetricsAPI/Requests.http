@@ -1,4 +1,13 @@
-### GET request to example server
-GET http://localhost:8080/hello
+@baseUrl = http://localhost:8080/api
 
-###
+### List user profiles
+GET {{baseUrl}}/users
+
+### List exercise dictionary
+GET {{baseUrl}}/exercises
+
+### Example analytics for user 1
+GET {{baseUrl}}/analytics/1?days=7
+
+### Example workout history for user 1
+GET {{baseUrl}}/workouts/1

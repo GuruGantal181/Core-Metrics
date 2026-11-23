@@ -1,6 +1,8 @@
 CREATE DATABASE IF NOT EXISTS core_metrics;
 USE core_metrics;
 
+-- WARNING: This script recreates the schema and DROPS existing project tables/data. Back up data before running it again.
+
 SET FOREIGN_KEY_CHECKS = 0;
 DROP VIEW IF EXISTS user_daily_nutrition_view;
 DROP FUNCTION IF EXISTS CalculateUserBMR;
@@ -66,7 +68,7 @@ CREATE TABLE strength_logs (
     log_id INT NOT NULL AUTO_INCREMENT,
     user_id INT NOT NULL,
     exercise_id INT NOT NULL,
-    weight_kg DECIMAL(5,2) NOT NULL,
+    weight_kg DECIMAL(5,2) NOT NULL CHECK (weight_kg >= 0),
     reps INT NOT NULL,
     logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (log_id),
@@ -147,19 +149,25 @@ DELIMITER ;
 DELIMITER //
 CREATE FUNCTION CalculateUserBMR(p_user_id INT)
 RETURNS DECIMAL(7,2)
-DETERMINISTIC
+NOT DETERMINISTIC
 READS SQL DATA
 BEGIN
     DECLARE v_weight DECIMAL(5,2);
     DECLARE v_height DECIMAL(5,2);
     DECLARE v_age INT;
-    DECLARE v_gender ENUM('M', 'F');
+    DECLARE v_gender CHAR(1);
     DECLARE v_bmr DECIMAL(7,2);
+    DECLARE v_user_found BOOLEAN DEFAULT TRUE;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_user_found = FALSE;
 
     SELECT weight_kg, height_cm, age, gender
     INTO v_weight, v_height, v_age, v_gender
     FROM user_profiles
     WHERE user_id = p_user_id;
+
+    IF NOT v_user_found THEN
+        RETURN NULL;
+    END IF;
 
     IF v_gender = 'M' THEN
         SET v_bmr = (10 * v_weight) + (6.25 * v_height) - (5 * v_age) + 5;

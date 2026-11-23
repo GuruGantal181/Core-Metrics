@@ -1,0 +1,29 @@
+Changed or added files in the corrected project:
+
+CoreMetricsAPI/Requests.http
+CoreMetricsAPI/src/main/java/com/coremetrics/api/ApiExceptionHandler.java (new)
+CoreMetricsAPI/src/main/java/com/coremetrics/api/CoreMetricsApiApplication.java
+CoreMetricsAPI/src/main/java/com/coremetrics/api/config/CorsConfig.java (new)
+CoreMetricsAPI/src/main/java/com/coremetrics/api/controller/fitnessController.java
+CoreMetricsAPI/src/main/java/coremetrics/dao/CardioLogDAO.java
+CoreMetricsAPI/src/main/java/coremetrics/dao/DatabaseConnection.java (new)
+CoreMetricsAPI/src/main/java/coremetrics/dao/DatabaseException.java (new)
+CoreMetricsAPI/src/main/java/coremetrics/dao/DietLogDAO.java
+CoreMetricsAPI/src/main/java/coremetrics/dao/ExerciseDAO.java
+CoreMetricsAPI/src/main/java/coremetrics/dao/RoutineDAO.java
+CoreMetricsAPI/src/main/java/coremetrics/dao/UserDAO.java
+CoreMetricsAPI/src/main/java/coremetrics/dao/WorkoutDAO.java
+CoreMetricsAPI/src/main/java/coremetrics/models/RoutineExercise.java (new)
+CoreMetricsAPI/src/main/java/coremetrics/utils/FitnessMath.java
+CoreMetricsAPI/src/main/resources/application.properties
+database/schema.sql
+frontend/app.js
+frontend/fake_api_response.json
+frontend/index.html
+frontend/test.html
+README.md
+AUDIT_REPORT.md
+CHANGED_FILES.txt
+
+Unchanged models (verified): User.java, Workout.java, CardioLog.java, DietLog.java, Routine.java
+Intentionally omitted: legacy root src/, .git/, and generated CoreMetricsAPI/target/.
