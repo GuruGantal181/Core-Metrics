@@ -78,16 +78,72 @@ public class DietLogDAO {
         return 0;
     }
 
-    public int getNetCaloriesInRange(int userId, Timestamp startInclusive, Timestamp endExclusive,CardioLogDAO cardioDao) {
+    public int getNetCaloriesInRange(int userId, Timestamp startInclusive, Timestamp endExclusive, CardioLogDAO cardioDao) {
         int caloriesIn = getTotalCaloriesInRange(userId, startInclusive, endExclusive);
         double cardioOut = cardioDao.getTotalCardioCaloriesInRange(userId, startInclusive, endExclusive);
         return caloriesIn - (int) Math.round(cardioOut);
     }
 
-    public double getCaloricDeficitInRange(int userId, Timestamp startInclusive, Timestamp endExclusive,double bmr, int daysInRange, CardioLogDAO cardioDao) {
+    public double getCaloricDeficitInRange(int userId, Timestamp startInclusive, Timestamp endExclusive, double bmr, int daysInRange, CardioLogDAO cardioDao) {
         int caloriesIn = getTotalCaloriesInRange(userId, startInclusive, endExclusive);
         double cardioOut = cardioDao.getTotalCardioCaloriesInRange(userId, startInclusive, endExclusive);
         double totalExpenditure = (bmr * daysInRange) + cardioOut;
         return totalExpenditure - caloriesIn;
+    }
+
+    // SUBQUERY: Fetch meals whose calories exceed this user's own average meal calories
+    public List<DietLog> getAboveAverageCalorieMeals(int userId) {
+        List<DietLog> result = new ArrayList<>();
+        String sql = "SELECT log_id, user_id, food_item, calories, protein_g, consumed_at "
+                   + "FROM diet_logs "
+                   + "WHERE user_id = ? AND calories > ("
+                   + "    SELECT AVG(calories) FROM diet_logs WHERE user_id = ?"
+                   + ") ORDER BY calories DESC";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, userId);
+            stmt.setInt(2, userId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                result.add(new DietLog(
+                        rs.getInt("log_id"),
+                        rs.getInt("user_id"),
+                        rs.getString("food_item"),
+                        rs.getInt("calories"),
+                        rs.getDouble("protein_g"),
+                        rs.getTimestamp("consumed_at")
+                ));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    // GROUP BY + HAVING: Find dates where user's total intake met or exceeded a calorie threshold
+    public List<String> getHighCalorieDays(int userId, int minDailyCalories) {
+        List<String> days = new ArrayList<>();
+        String sql = "SELECT DATE(consumed_at) AS log_date, SUM(calories) AS daily_total "
+                   + "FROM diet_logs "
+                   + "WHERE user_id = ? "
+                   + "GROUP BY DATE(consumed_at) "
+                   + "HAVING SUM(calories) >= ? "
+                   + "ORDER BY log_date DESC";
+
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, userId);
+            stmt.setInt(2, minDailyCalories);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                days.add(rs.getDate("log_date") + " -> " + rs.getInt("daily_total") + " kcal");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return days;
     }
 }

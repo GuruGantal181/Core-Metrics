@@ -28,8 +28,7 @@ public class UserDAO {
             if (rs.next()) {
                 return rs.getInt(1);
             }
-        } 
-        catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
         return -1;
@@ -53,10 +52,38 @@ public class UserDAO {
                     rs.getString("gender")
                 );
             }
-        } 
-        catch (SQLException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+    // UPDATE
+    public boolean updateUserWeight(int userId, double newWeightKg) {
+        String sql = "UPDATE user_profiles SET weight_kg = ? WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setDouble(1, newWeightKg);
+            stmt.setInt(2, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // DELETE (Cascades to child workout, cardio, diet, and routine logs)
+    public boolean deleteUser(int userId) {
+        String sql = "DELETE FROM user_profiles WHERE user_id = ?";
+        try (Connection conn = DriverManager.getConnection(URL, USER, PASS);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, userId);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
