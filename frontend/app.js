@@ -1,33 +1,46 @@
-// Swap these two lines once Keshav's Spring Boot server is running
-const IS_MOCK_MODE = true;
 const API_BASE_URL = "http://localhost:8080/api";
+const CURRENT_USER_ID = 1;
+
+// Matches starter seed IDs in database/schema.sql
+const EXERCISE_NAMES = {
+  1: "Bench Press",
+  2: "Pullups",
+  3: "Treadmill Run",
+  4: "Cycling"
+};
 
 let rmChartInstance = null;
 
+function calculate1RM(weightKg, reps) {
+  if (reps <= 1) return weightKg;
+  return weightKg * (1 + reps / 30.0);
+}
+
 async function loadDashboard() {
-  const endpoint = IS_MOCK_MODE
-    ? "fake_api_response.json"
-    : `${API_BASE_URL}/dashboard`;
-
   try {
-    const response = await fetch(endpoint);
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
+    const [analyticsRes, workoutsRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/analytics/${CURRENT_USER_ID}`),
+      fetch(`${API_BASE_URL}/workouts/${CURRENT_USER_ID}`)
+    ]);
 
-    const data = await response.json();
-    renderBMR(data.user);
-    renderWorkoutTable(data.workouts);
-    render1RMChart(data.workouts);
+    if (!analyticsRes.ok) throw new Error(`Analytics error: ${analyticsRes.status}`);
+    if (!workoutsRes.ok) throw new Error(`Workouts error: ${workoutsRes.status}`);
+
+    const analytics = await analyticsRes.json();
+    const workouts = await workoutsRes.json();
+
+    renderBMR(analytics.bmr);
+    renderWorkoutTable(workouts);
+    render1RMChart(workouts);
   } catch (error) {
-    console.error("Failed to load dashboard data:", error);
+    console.error("Failed to load live dashboard data:", error);
   }
 }
 
-function renderBMR(user) {
+function renderBMR(bmr) {
   const bmrEl = document.getElementById("bmr-display");
-  if (bmrEl) {
-    bmrEl.textContent = user.bmr_kcal;
+  if (bmrEl && bmr != null) {
+    bmrEl.textContent = Math.round(bmr);
   }
 }
 
@@ -36,14 +49,22 @@ function renderWorkoutTable(workouts) {
   if (!tbody) return;
 
   tbody.innerHTML = "";
+
+  if (workouts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No workouts logged yet.</td></tr>`;
+    return;
+  }
+
   workouts.forEach((log) => {
+    const exerciseName = EXERCISE_NAMES[log.exerciseId] || `Exercise #${log.exerciseId}`;
+    const est1RM = calculate1RM(log.weightKg, log.reps).toFixed(1);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${log.date}</td>
-      <td>${log.exercise}</td>
-      <td>${log.weight_kg}</td>
+      <td>${exerciseName}</td>
+      <td>${log.weightKg}</td>
       <td>${log.reps}</td>
-      <td>${log.estimated_1rm}</td>
+      <td>${est1RM}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -57,14 +78,19 @@ function render1RMChart(workouts) {
     rmChartInstance.destroy();
   }
 
+  const labels = workouts.map((w, idx) =>
+    w.loggedAt ? new Date(w.loggedAt).toLocaleDateString() : `Set #${idx + 1}`
+  );
+  const dataPoints = workouts.map((w) => Number(calculate1RM(w.weightKg, w.reps).toFixed(1)));
+
   rmChartInstance = new Chart(canvas, {
     type: "line",
     data: {
-      labels: workouts.map((w) => w.date),
+      labels: labels,
       datasets: [
         {
           label: "Estimated 1RM (kg)",
-          data: workouts.map((w) => w.estimated_1rm),
+          data: dataPoints,
           borderColor: "#0d6efd",
           tension: 0.2
         }
@@ -81,16 +107,11 @@ function setupWorkoutForm() {
     e.preventDefault();
 
     const payload = {
-      exercise: document.getElementById("exercise-input").value,
-      weight_kg: parseFloat(document.getElementById("weight-input").value),
+      userId: CURRENT_USER_ID,
+      exerciseId: parseInt(document.getElementById("exercise-input").value, 10),
+      weightKg: parseFloat(document.getElementById("weight-input").value),
       reps: parseInt(document.getElementById("reps-input").value, 10)
     };
-
-    if (IS_MOCK_MODE) {
-      console.log("Mock POST payload ready for Spring Boot:", payload);
-      form.reset();
-      return;
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/workouts`, {
@@ -98,11 +119,13 @@ function setupWorkoutForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+
       if (!response.ok) throw new Error(`POST failed: ${response.status}`);
+
       form.reset();
       loadDashboard();
     } catch (error) {
-      console.error("Failed to log workout:", error);
+      console.error("Failed to save workout:", error);
     }
   });
 }

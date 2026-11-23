@@ -44,15 +44,18 @@
                         <form id="log-workout-form">
                             <div class="mb-3">
                                 <label for="exercise-input" class="form-label">Exercise</label>
-                                <input type="text" class="form-control" id="exercise-input" placeholder="e.g. Bench Press" required>
+                                <select class="form-select" id="exercise-input" required>
+                                    <option value="1">Bench Press</option>
+                                    <option value="2">Pullups</option>
+                                </select>
                             </div>
                             <div class="mb-3">
                                 <label for="weight-input" class="form-label">Weight (kg)</label>
-                                <input type="number" step="0.5" class="form-control" id="weight-input" placeholder="e.g. 60" required>
+                                <input type="number" step="0.5" min="0" class="form-control" id="weight-input" placeholder="e.g. 60" required>
                             </div>
                             <div class="mb-3">
                                 <label for="reps-input" class="form-label">Reps</label>
-                                <input type="number" class="form-control" id="reps-input" placeholder="e.g. 8" required>
+                                <input type="number" min="1" class="form-control" id="reps-input" placeholder="e.g. 8" required>
                             </div>
                             <button type="submit" class="btn btn-primary w-100">Save Workout</button>
                         </form>
