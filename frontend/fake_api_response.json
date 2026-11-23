@@ -1,0 +1,12 @@
+{
+  "user": {
+    "name": "Devansh",
+    "bmr_kcal": 1825,
+    "daily_target_kcal": 1800
+  },
+  "workouts": [
+    { "date": "2026-11-01", "exercise": "Bench Press", "weight_kg": 60, "reps": 2, "estimated_1rm": 64.0 },
+    { "date": "2026-11-08", "exercise": "Bench Press", "weight_kg": 62.5, "reps": 2, "estimated_1rm": 66.7 },
+    { "date": "2026-11-15", "exercise": "Bench Press", "weight_kg": 65, "reps": 2, "estimated_1rm": 69.3 }
+  ]
+}
