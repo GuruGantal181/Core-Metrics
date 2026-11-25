@@ -1,9 +1,8 @@
 package coremetrics.models;
+
 import java.sql.Timestamp;
 
-public class DietLog {
-    private int logId;
-    private int userId;
+public class DietLog extends LogEntry {
     private String foodItem;
     private int calories;
     private double proteinG;
@@ -13,27 +12,16 @@ public class DietLog {
     }
 
     public DietLog(int logId, int userId, String foodItem, int calories, double proteinG) {
-        this.logId = logId;
-        this.userId = userId;
-        this.foodItem = foodItem;
-        this.calories = calories;
-        this.proteinG = proteinG;
+        this(logId, userId, foodItem, calories, proteinG, null);
     }
 
     public DietLog(int logId, int userId, String foodItem, int calories, double proteinG, Timestamp consumedAt) {
-        this.logId = logId;
-        this.userId = userId;
+        super(logId, userId);
         this.foodItem = foodItem;
         this.calories = calories;
         this.proteinG = proteinG;
-        this.consumedAt = consumedAt;
+        this.consumedAt = copyOf(consumedAt);
     }
-
-    public int getLogId() { return logId; }
-    public void setLogId(int logId) { this.logId = logId; }
-
-    public int getUserId() { return userId; }
-    public void setUserId(int userId) { this.userId = userId; }
 
     public String getFoodItem() { return foodItem; }
     public void setFoodItem(String foodItem) { this.foodItem = foodItem; }
@@ -44,6 +32,17 @@ public class DietLog {
     public double getProteinG() { return proteinG; }
     public void setProteinG(double proteinG) { this.proteinG = proteinG; }
 
-    public Timestamp getConsumedAt() { return consumedAt; }
-    public void setConsumedAt(Timestamp consumedAt) { this.consumedAt = consumedAt; }
+    public Timestamp getConsumedAt() { return copyOf(consumedAt); }
+    public void setConsumedAt(Timestamp consumedAt) { this.consumedAt = copyOf(consumedAt); }
+
+    @Override
+    public String describe() {
+        return foodItem + " - " + calories + " kcal, " + proteinG + " g protein";
+    }
+
+    /** Meals add to energy balance. */
+    @Override
+    public double energyBalanceKcal() {
+        return calories;
+    }
 }

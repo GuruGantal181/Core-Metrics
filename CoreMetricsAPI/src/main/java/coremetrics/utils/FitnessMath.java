@@ -1,5 +1,10 @@
 package coremetrics.utils;
 
+import coremetrics.models.User;
+import coremetrics.models.Workout;
+
+import java.time.Duration;
+
 public final class FitnessMath {
 
     private FitnessMath() {
@@ -35,5 +40,34 @@ public final class FitnessMath {
             throw new IllegalArgumentException("MET, body weight, and duration must be positive.");
         }
         return metValue * weightKg * (durationMinutes / 60.0);
+    }
+
+    // ---- Method overloading: convenience variants that delegate to the primitive versions ----
+
+    /** Overload: BMR straight from a {@link User} profile. */
+    public static double calculateBMR(User user) {
+        if (user == null) {
+            throw new IllegalArgumentException("User profile is required.");
+        }
+        return calculateBMR(user.getWeightKg(), user.getHeightCm(), user.getAge(), user.getGender());
+    }
+
+    /** Overload: Epley 1RM straight from a {@link Workout}. */
+    public static double calculate1RM(Workout workout) {
+        if (workout == null) {
+            throw new IllegalArgumentException("Workout is required.");
+        }
+        return calculate1RM(workout.getWeightKg(), workout.getReps());
+    }
+
+    /** Overload: MET calories using a {@link Duration} instead of whole minutes. */
+    public static double calculateMETCalories(double metValue, double weightKg, Duration duration) {
+        if (duration == null || duration.isZero() || duration.isNegative()) {
+            throw new IllegalArgumentException("MET, body weight, and duration must be positive.");
+        }
+        if (metValue <= 0 || weightKg <= 0) {
+            throw new IllegalArgumentException("MET, body weight, and duration must be positive.");
+        }
+        return metValue * weightKg * (duration.toMillis() / 3_600_000.0);
     }
 }
